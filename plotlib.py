@@ -322,6 +322,7 @@ def _make_frame(fname, crop=None, solute_adjustment=None):
         shape = [int(x) for x in config.space.shape]
         biomass_names = [x for x in f.keys() if "_data" in x and "phage" not in x]
         phage_names = [x for x in f.keys() if "_data" in x and "phage" in x]
+        print(f.keys())
         if solute_adjustment:
             sv = np.log10(f["solute_value"] * 1 + solute_adjustment)
 
@@ -451,6 +452,7 @@ def _plot_frame(
 
     outname = f'{outdir}/{prefix}{file.split("/")[-1][:-4]}.{format}'
     with np.load(file, allow_pickle=True) as f:
+
         biomass_names = [x for x in f.keys() if "_data" in x and "phage" not in x]
         phage_names = [x for x in f.keys() if "_data" in x and "phage" in x]
 
@@ -458,14 +460,26 @@ def _plot_frame(
 
         # set up biomass
         biomass = [np.rec.array(f[x]) for x in biomass_names]
-        biomass_totals = [np.zeros(np.prod(shape)) for x in biomass_names]
-        [np.add.at(tot, c.location, c.mass) for tot, c in zip(biomass_totals, biomass)]
+       
+    
+        biomass_totals = [np.zeros(np.prod(shape)) for x in ['gen0', 'gen1', 'infected']]
+        for c in biomass:
+            if not hasattr(c, 'genotype'):
+                [np.add.at(biomass_totals[2], c.location, c.mass)]
+            else:
+                gen1 = c[c.genotype==1]
+                gen0 = c[c.genotype==0]
 
+                [np.add.at(biomass_totals[1], gen1.location, gen1.mass)]
+                [np.add.at(biomass_totals[0], gen0.location, gen0.mass)]
+            
+
+        
         def _make_df(data):
             return pandas.DataFrame({"count": data, "x": gridcols[1], "y": gridcols[0]})
 
         dfs = [_make_df(d) for d in biomass_totals]
-        for df, species in zip(dfs, biomass_names):
+        for df, species in zip(dfs, ['gen0', 'gen1', 'infected']):
             df["species"] = sub("_data", "", species)
         bio = pandas.concat(dfs)
         minv = 0.20
@@ -498,7 +512,7 @@ def _plot_frame(
 
         # NORMAL:
         colors = ["red", "blue", "green", "black"]
-        lims = ["Species1", "Species2", "infected", "phage"]
+        lims = ["gen0", "gen1", "infected", "phage"]
 
         if style == "single":
             colors = ["red", "orange", "green", "black"]
@@ -510,6 +524,9 @@ def _plot_frame(
 
         colors = ["red", "blue", "orange"]
         lims = ["Species1", "Species2", "Matrix1"]
+        colors = ["red", "blue", "green", "black"]
+        lims = ["gen0", "gen1", "infected", "phage"]
+
 
         if solute_adjustment is not None:
             sv = np.log10(f["solute_value"] * 1 + solute_adjustment)
@@ -601,6 +618,7 @@ def plot_all_frames(
     solute_adjustment=None,
     **kwargs,
 ):
+    print("About to print 'ouput'")
     print(outdir)
     if not os.path.exists(outdir):
         os.makedirs(outdir)
@@ -610,11 +628,13 @@ def plot_all_frames(
         if ".npz" in x and noframe(x, outdir)
     ]
     if not flist:
+        print("Returning")
         return
     cfg = sb.getcfg(flist[0])
     shape = tuple(map(int, cfg.space.shape))
 
     if len(shape) == 2:
+
         maxb, maxp = 6.5e-12, 1000
         # solute_adjustment = 0.05
         if nprocesses > 1:
@@ -1383,6 +1403,7 @@ def explorer(df, plotfunc, groups, sets=None, onupdate=None, updatef=None):
 
 
 def _main():
+
     matplotlib.use("agg")
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--video")
@@ -1432,6 +1453,7 @@ def _main():
 
         # print(kwargs)
         if args.old:
+            print("Calling plot_all_frames")
             plot_all_frames(args.video, **kwargs)
         else:
             make_video(args.video, **kwargs)

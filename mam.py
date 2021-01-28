@@ -49,8 +49,9 @@ class Bacteria(sb.Bacteria):
         parameters = dict(zip(parent.dtype.names, parent))
         if params:
             parameters.update(params)
-        muts = (random() < parent.mut_rate, random() < parent.mut_rate) 
-        genotype = (parent.genotype[0] if not muts[0] else 1 - parent.genotype[0], parent.genotype[1] if not muts[1] else 1 - parent.genotype[1])
+        muts = random() < parent.mut_rate
+        genotype = parent.genotype if not muts else 1 - parent.genotype
+        #print(muts)
         parameters['genotype'] = genotype
         return self.add_individual(parent.location, parameters)
 
@@ -86,8 +87,8 @@ def config():
                 "resistant": False,
                 "adsorbable": True,
                 "yield_s": 0.495,
-                "genotype": (1,1),
-                "mut_rate": 10e-6,
+                "genotype": 1,
+                "mut_rate": 1,
             },
             "species2": {
                 "density": 200e3,
@@ -99,8 +100,8 @@ def config():
                 "resistant": False,
                 "adsorbable": False,
                 "yield_s": 0.495,
-                "genotype": (1,0),
-                "mut_rate": 10e-6,
+                "genotype": 1,
+                "mut_rate": 1,
             },
             "infected": {
                 "density": 200e3,
@@ -116,7 +117,7 @@ def config():
                 "burst": 120,
                 "incubation_period": 0.02,
                 "adhesion": 1,
-                "genotype": (1,1),
+                "genotype": 1,
                 "a": 0,
                 "k": 10e-2,
             },
