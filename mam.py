@@ -49,10 +49,17 @@ class Bacteria(sb.Bacteria):
         parameters = dict(zip(parent.dtype.names, parent))
         if params:
             parameters.update(params)
-        muts = random() < parent.mut_rate
-        genotype = parent.genotype if not muts else 1 - parent.genotype
-        #print(muts)
-        parameters['genotype'] = genotype
+        
+        #parameters['genotype'] = np.random.choice(4, p=parent.mut_rate[parent.genotype])
+        mut = random()
+
+        if parent.genotype == 1 and mut < parent.mut_1:
+            parameters['genotype'] = 0
+            parameters['mu'] =  parent.mu_0
+        elif mut < parent.mut_0:
+            parameters['genotype'] = 1
+            parameters['mu'] =  parent.mu_1
+
         return self.add_individual(parent.location, parameters)
 
 
@@ -85,10 +92,13 @@ def config():
                 "mu": 24.5,
                 "adhesion": 1,
                 "resistant": False,
-                "adsorbable": True,
+                "adsorbable": False,
                 "yield_s": 0.495,
                 "genotype": 1,
-                "mut_rate": 1,
+                "mut_1": 1,
+                "mut_0": 0,
+                "mu_0": 24.5,
+                "mu_1": 24.5,
             },
             "species2": {
                 "density": 200e3,
@@ -101,7 +111,10 @@ def config():
                 "adsorbable": False,
                 "yield_s": 0.495,
                 "genotype": 1,
-                "mut_rate": 1,
+                "mut_1": 1,
+                "mut_0": 0,
+                "mu_0": 24.5,
+                "mu_1": 24.5,
             },
             "infected": {
                 "density": 200e3,
@@ -144,7 +157,7 @@ def setup(cfg, outdir="tmp"):
     sim.add_container(substrate, *activeSpecies, infected, phage)
 
     sb.inoculate_at(space, 0, activeSpecies[0], int(cfg.general.init_count * cfg.general.init_f))
-    sb.inoculate_at(space, 0, activeSpecies[1], int(cfg.general.init_count * (1 - cfg.general.init_f)))
+    sb.inoculate_at(space, 0, activeSpecies[1], int(cfg.general.init_count * (cfg.general.init_f)))
 
     sb.initialize_bulk_substrate(space, 0, substrate)
 

@@ -1135,6 +1135,7 @@ def plot_heatmap(
 
     # TODO: fix varnames.
     data = data.copy()
+    print(data)
     data[fill] = np.clip(data[fill], fmin, fmax)
     if facets is None:
         axes = [xcol, ycol]
@@ -1154,11 +1155,12 @@ def plot_heatmap(
         df = data.groupby(axes).apply(summary).reset_index()
 
     xlabs = (
-        xlabs if xlabs is not None else ["{:0.2f}".format(x) for x in df[xcol].unique()]
+        xlabs if xlabs is not None else ["{:0.5f}".format(float(x)) for x in df[xcol].unique()]
     )
     ylabs = (
-        ylabs if ylabs is not None else ["{:0.2f}".format(y) for y in df[ycol].unique()]
+        ylabs if ylabs is not None else ["{:0.5f}".format(float(y)) for y in df[ycol].unique()]
     )
+
 
     # TODO:
     if norm_axes:
@@ -1187,15 +1189,16 @@ def plot_heatmap(
     plot = ggplot(data=df)
     plot += labels.xlab(xcol if xaxislabel is None else xaxislabel)
     plot += labels.ylab(ycol if yaxislabel is None else yaxislabel)
-    plot += scales.scale_y_continuous(
+    plot += scales.scale_y_discrete(
         breaks=df[ycol].unique(), labels=ylabs, expand=(0.01, 0.01)
     )
     # plot += scales.scale_x_reverse(breaks=df[xcol].unique(), labels=xlabs)
-    plot += scales.scale_x_continuous(
+    plot += scales.scale_x_discrete(
         breaks=df[xcol].unique(), labels=xlabs, expand=(0.005, 0.005)
     )
     if facets is not None:
         plot += facet_wrap(facets, ncol=3)
+
 
     # if len(facets) > 1:
     #     plot += facet_wrap(facets, ncol=(df[facets[-1]].unique().size))
@@ -1208,9 +1211,10 @@ def plot_heatmap(
     plot += geoms.geom_tile(aes(x=xcol, y=ycol, fill=fill))
     fmax = fmax if fmax is not None else df[fill].max()
     fmin = fmin if fmin is not None else df[fill].min()
-    # midpoint = (fmin + fmax) / 2
-    midpoint = 3
-
+    midpoint = (fmin + fmax) / 2
+    #midpoint = 3
+    print(fmax)
+    print(fmin)
     if title:
         plot += labels.ggtitle(title)
 
@@ -1223,18 +1227,20 @@ def plot_heatmap(
     # )
     stepsize = (fmax - fmin) / 5
 
-    fmin = -0.10
-    fmax = 0.55
-    stepsize = 0.1
+    #fmin = -0.10
+    #fmax = 0.55
+    #stepsize = 80
+
     plot += scales.scale_fill_gradientn(
         colors=("#b2182b", "#f7f7f7", "#2166ac"),
         # values=(0, 0.1, 1),
         # breaks=np.arange(0, 100, 10),
-        values=(0, fmin / (fmin - fmax), 1),
+        #values=(0, fmin / (fmin - fmax), 1),
         breaks=np.arange(fmin, fmax + stepsize / 10, stepsize),
         limits=(fmin, fmax),
         midpoint=midpoint,
     )
+
 
     # plot += scales.scale_fill_gradient(limits=(fmin, fmax), low='#f5f5f5',
     #                                    high='#101088', midpoint=midpoint)
@@ -1262,7 +1268,7 @@ def plot_heatmap(
         height=height * 1.5,
         width=width * 1.5,
         dpi=150,
-        verbose=False,
+        verbose=True,
         limitsize=False,
     )
     print(f"Saved {outname}.", flush=True)
@@ -1460,4 +1466,6 @@ def _main():
 
 
 if __name__ == "__main__":
+    plot_heatmap(load_data("data/2021.03.02/biggerheat", write_summaries=False), xcol="species1_mut_1", ycol="species2_mut_1",fill="phage_N")
+    #return load_data("data/2021.02.28/biggerheat", write_summaries=False)
     _main()
