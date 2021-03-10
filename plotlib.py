@@ -23,6 +23,8 @@ from tqdm import tqdm
 from itertools import product
 from functools import partial
 
+import numpy as np
+
 # matplotlib.use("agg")
 tqdm80 = partial(tqdm, ncols=80)
 # matplotlib deprecation warnings
@@ -489,9 +491,9 @@ def _plot_frame(
         ) + minv
 
         # phage
-        # phage = np.rec.array(f[phage_names[0]])
+        phage = np.rec.array(f[phage_names[0]])
         phage_total = np.zeros(np.prod(shape))
-        # np.add.at(phage_total, phage.location, 1)
+        np.add.at(phage_total, phage.location, 1)
         phg = _make_df(phage_total)
 
         minv = 0.250
@@ -1135,8 +1137,9 @@ def plot_heatmap(
 
     # TODO: fix varnames.
     data = data.copy()
-    print(data)
+
     data[fill] = np.clip(data[fill], fmin, fmax)
+    print(data)
     if facets is None:
         axes = [xcol, ycol]
     else:
@@ -1154,11 +1157,13 @@ def plot_heatmap(
     elif callable(summary):
         df = data.groupby(axes).apply(summary).reset_index()
 
+    
+
     xlabs = (
-        xlabs if xlabs is not None else ["{:0.5f}".format(float(x)) for x in df[xcol].unique()]
+        xlabs if xlabs is not None else ["{:0.2f}".format(float(x)) for x in df[xcol].unique()]
     )
     ylabs = (
-        ylabs if ylabs is not None else ["{:0.5f}".format(float(y)) for y in df[ycol].unique()]
+        ylabs if ylabs is not None else ["{:0.2f}".format(float(y)) for y in df[ycol].unique()]
     )
 
 
@@ -1260,6 +1265,9 @@ def plot_heatmap(
     # else:
     # plot += scales.scale_fill_gradient2(limits=(fmin, fmax), midpoint=midpoint)
     outname = "{}{}.{}".format(prefix, fill, format)
+    print(outname)
+    print(height)
+    print(width)
     # height = 5 * height
     # plot.save(outname, height=4, width=7.5, dpi=150,
     # plot.save(outname, height=height*3, width=width*3, dpi=150,
@@ -1466,6 +1474,7 @@ def _main():
 
 
 if __name__ == "__main__":
-    plot_heatmap(load_data("data/2021.03.02/biggerheat", write_summaries=False), xcol="species1_mut_1", ycol="species2_mut_1",fill="phage_N")
+    plot_heatmap(load_data("data/2021.03.08/genphage", write_summaries=False), xcol="init_f", ycol="genotype",fill="phage_N")
+    #plot_heatmap(load_data("data/2021.03.02/biggerheat", write_summaries=False), xcol="species1_mut_1", ycol="species2_mut_1",fill="phage_N")
     #return load_data("data/2021.02.28/biggerheat", write_summaries=False)
     _main()

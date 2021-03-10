@@ -42,6 +42,8 @@ class Bacteria(sb.Bacteria):
         if not bacterium == self.with_id(bacterium.id):
             msg = "Individual does not appear to be in this container."
             raise RuntimeError(msg)
+        if phage.generalist:
+            return [True, True]
         return [bacterium.genotype == phage.genotype, bacterium.adsorbable]
 
     def clone(self, parent, **params):
@@ -72,7 +74,7 @@ def config():
                 "seed": 1235,
                 "runtime": 20,
                 "init_count": 150,
-                "init_f": 0.95,
+                "init_f": .95,
                 "line_shove": False,
                 "max_sim_time": 100,
                 "3D": False,
@@ -92,10 +94,10 @@ def config():
                 "mu": 24.5,
                 "adhesion": 1,
                 "resistant": False,
-                "adsorbable": False,
+                "adsorbable": True,
                 "yield_s": 0.495,
-                "genotype": 1,
-                "mut_1": 1,
+                "genotype": 0,
+                "mut_1": 0,
                 "mut_0": 0,
                 "mu_0": 24.5,
                 "mu_1": 24.5,
@@ -108,10 +110,10 @@ def config():
                 "mu": 24.5,
                 "adhesion": 1,
                 "resistant": False,
-                "adsorbable": False,
+                "adsorbable": True,
                 "yield_s": 0.495,
                 "genotype": 1,
-                "mut_1": 1,
+                "mut_1": 0,
                 "mut_0": 0,
                 "mu_0": 24.5,
                 "mu_1": 24.5,
@@ -124,16 +126,36 @@ def config():
                 "adsorbable": False, # not sure if used
                 "adhesion": 1,
             },
+            "infected_s": {
+                "density": 200e3,
+                "mass": 1e-12,
+                "division_mass": 1.333e-12,
+                "impedance": 6,
+                "adsorbable": False, # not sure if used
+                "adhesion": 1,
+            },
             "phage": {
+                "diffusivity": 3.30e-6,
+                "adsorption_rate": 70,
+                "burst": 60,
+                "incubation_period": 0.02,
+                "adhesion": 1,
+                "genotype": 1,
+                "generalist": True,
+                "a": 0,
+                "k": 10e-2,
+            },
+            "phage_s": {
                 "diffusivity": 3.30e-6,
                 "adsorption_rate": 70,
                 "burst": 120,
                 "incubation_period": 0.02,
                 "adhesion": 1,
                 "genotype": 1,
+                "generalist": False,
                 "a": 0,
                 "k": 10e-2,
-            },
+            }
         }
     )
 
@@ -154,10 +176,15 @@ def setup(cfg, outdir="tmp"):
     infected = sb.InfectedBacteria("infected", space, cfg.infected, cfg.phage)
     pairs = {phage: infected}
 
+    phage_s = sb.Phage("phage_s", space, cfg.phage_s)
+    infected_s = sb.InfectedBacteria("infected_s", space, cfg.infected_s, cfg.phage_s)
+    pairs_s = {phage_s: infected_s}
+
     sim.add_container(substrate, *activeSpecies, infected, phage)
+    sim.add_container(substrate, *activeSpecies, infected_s, phage_s)
 
     sb.inoculate_at(space, 0, activeSpecies[0], int(cfg.general.init_count * cfg.general.init_f))
-    sb.inoculate_at(space, 0, activeSpecies[1], int(cfg.general.init_count * (cfg.general.init_f)))
+    sb.inoculate_at(space, 0, activeSpecies[1], int(cfg.general.init_count * (1-cfg.general.init_f)))
 
     sb.initialize_bulk_substrate(space, 0, substrate)
 
@@ -168,24 +195,30 @@ def setup(cfg, outdir="tmp"):
         cfg.infection.duration,
         cfg.space.well_mixed,
     )
-    sim.add_event(ic.infect_point, ic.condition, [phage, activeSpecies, activeSpecies[0]])
+
+    sim.add_event(ic.infect_point, ic.condition, [phage, activeSpecies, activeSpecies[1]])
+    sim.add_event(ic.infect_point, ic.condition, [phage_s, activeSpecies, activeSpecies[1]])
     # change infection duration in InfectAndEndController
     sim.add_end_condition(ic.end_condition, f"FIN-IC: {10} days after infection start")
 
     reactions = [sb.MonodRateReaction(substrate, sp) for sp in activeSpecies]
-
+    print(len(activeSpecies))
+    print(len(reactions))
     sim.add_behavior(
         sb.DiffusionReaction(substrate, reactions),
         sb.Biomass_growth(reactions),
         sb.Bacterial_division(),
         sb.Lysis(pairs),
+        sb.Lysis(pairs_s),
         sb.Erode_individuals(cfg.erosion.biomass_rate),
         sb.Phage_randomwalk(cfg.erosion.phage_rate),
         sb.Detach_biomass(),
         sb.Relax_biofilm(),
         sb.Phage_interaction(pairs),
+        sb.Phage_interaction(pairs_s)
     )
 
+    print(len(activeSpecies))
     sim.initialize(f"{outdir}/run1", [], cfg.general.output_frequency)
     return sim
 
