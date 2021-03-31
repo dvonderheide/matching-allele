@@ -1137,9 +1137,19 @@ def plot_heatmap(
 
     # TODO: fix varnames.
     data = data.copy()
+    for column in data:
+        print(column)
+    data["phage_ratio"] = [(s+1)/(g+1) for (s,g) in zip(data["phage_s_prod"], data["phage_prod"])]
+    data["phage_frequency"] = [(s+1)/(s+g+1) for (s,g) in zip(data["phage_s_prod"], data["phage_prod"])]
+    
+    for (s,g,i, f, n1, n2) in zip(data["phage_s_prod"], data["phage_prod"], data["incubation_period"], data["init_f"], data["phage_N"], data["phage_s_N"]):
+        if n1==0 and n2==0:
+            print(s)
+            print(g)
+            print((s+1)/(s+g+1))
+            print(f)
+            print("BREAK")
 
-    data[fill] = np.clip(data[fill], fmin, fmax)
-    print(data)
     if facets is None:
         axes = [xcol, ycol]
     else:
@@ -1216,10 +1226,12 @@ def plot_heatmap(
     plot += geoms.geom_tile(aes(x=xcol, y=ycol, fill=fill))
     fmax = fmax if fmax is not None else df[fill].max()
     fmin = fmin if fmin is not None else df[fill].min()
+    #fmin=0
+    #fmax=2
     midpoint = (fmin + fmax) / 2
-    #midpoint = 3
-    print(fmax)
-    print(fmin)
+    #midpoint = 1
+    print(df[fill].max())
+    print(df[fill].min())
     if title:
         plot += labels.ggtitle(title)
 
@@ -1474,7 +1486,9 @@ def _main():
 
 
 if __name__ == "__main__":
-    plot_heatmap(load_data("data/2021.03.08/genphage", write_summaries=False), xcol="init_f", ycol="genotype",fill="phage_N")
-    #plot_heatmap(load_data("data/2021.03.02/biggerheat", write_summaries=False), xcol="species1_mut_1", ycol="species2_mut_1",fill="phage_N")
+    #plot_heatmap(load_data("data/2021.03.10/burstsweep", write_summaries=False), xcol="init_f", ycol="phage_burst",fill="phage_ratio", fmin=0, fmax = 2)
+    #plot_heatmap(load_data("data/2021.03.14/ltime", write_summaries=False), xcol="incubation_period", ycol="init_f",fill="phage_ratio")
+    plot_heatmap(load_data("data/2021.03.30/sweeplog", write_summaries=False), ycol="incubation_period", xcol="init_f",fill="phage_frequency")
+    #plot_heatmap(load_data("data/2021.03.18/justsp", write_summaries=False), xcol="incubation_period", ycol="init_f",fill="phage_prod")
     #return load_data("data/2021.02.28/biggerheat", write_summaries=False)
     _main()
