@@ -74,7 +74,7 @@ def config():
                 "seed": 65820157,
                 "runtime": 20,
                 "init_count": 150,
-                "init_f": 0.05,
+                "init_f": 0.9,
                 "line_shove": False,
                 "max_sim_time": 100,
                 "3D": False,
@@ -83,7 +83,7 @@ def config():
                 "targetone": True,
             },
             "space": {"dl": 3e-6, "shape": (75, 200), "well_mixed": False},
-            "infection": {'count': 120, 'height': 20e-6, 'duration': 1.5},
+            "infection": {'count': 120, 'height': 20e-6, 'duration': 600},
             "substrate": {"max": 6, "diffusivity": 2e-5, "K": 1.18, "h": 15e-6},
             "erosion": {"biomass_rate": 7.5e8, "phage_rate": 2.4e12},
             "species1": {
@@ -140,13 +140,13 @@ def config():
                 "diffusivity": 3.30e-6,
                 "adsorption_rate": 70,
                 "burst": 120,
-                "incubation_period": 0.01,
+                "incubation_period": 0.1,
                 "adhesion": 1,
                 "genotype": 1,
                 "generalist": True,
                 "a": 0,
                 "k": 10e-2,
-                "multi_infect":True,
+                "multi_infect":False,
             },
             "phage_s": {
                 "diffusivity": 3.30e-6,
@@ -182,11 +182,11 @@ def setup(cfg, outdir="tmp"):
     phage_s = sb.Phage("phage_s", space, cfg.phage_s)
     infected_s = sb.InfectedBacteria("infected_s", space, cfg.infected_s, cfg.phage_s)
     pairs = {phage: infected, phage_s : infected_s}
-    #pairs = {phage: infected}
+    #pairs = {phage_s: infected_s}
 
 
     sim.add_container(substrate, *activeSpecies, infected, phage, infected_s, phage_s)
-    #sim.add_container(substrate, *activeSpecies, infected, phage)
+    #sim.add_container(substrate, *activeSpecies, infected_s, phage_s)
 
     sb.inoculate_at(space, 0, activeSpecies[0], int(cfg.general.init_count * cfg.general.init_f))
     sb.inoculate_at(space, 0, activeSpecies[1], int(cfg.general.init_count * (1-cfg.general.init_f)))
@@ -201,14 +201,13 @@ def setup(cfg, outdir="tmp"):
         cfg.space.well_mixed,
     )
     sim.add_event(ic.infect_point, ic.condition, [phage_s, activeSpecies, activeSpecies[1]])
-    sim.add_event(ic.infect_point, ic.condition, [phage, activeSpecies, activeSpecies])
+    sim.add_event(ic.infect_point, ic.condition, [phage, activeSpecies, activeSpecies[0]])
     
     # change infection duration in InfectAndEndController
-    sim.add_end_condition(ic.end_condition, f"FIN-IC: {10} days after infection start")
+    sim.add_end_condition(ic.end_condition, f"FIN-IC: {20} days after infection start")
 
     reactions = [sb.MonodRateReaction(substrate, sp) for sp in activeSpecies]
-    print(len(activeSpecies))
-    print(len(reactions))
+
     sim.add_behavior(
         sb.DiffusionReaction(substrate, reactions),
         sb.Biomass_growth(reactions),

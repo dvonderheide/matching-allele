@@ -492,9 +492,17 @@ def _plot_frame(
 
         # phage
         phage = np.rec.array(f[phage_names[0]])
-        phage_total = np.zeros(np.prod(shape))
-        np.add.at(phage_total, phage.location, 1)
-        phg = _make_df(phage_total)
+        phage_s = np.rec.array(f[phage_names[1]])
+
+        phage_total = [np.zeros(np.prod(shape)) for x in ['phage','phage_s']]
+        np.add.at(phage_total[0], phage.location, 1)
+        np.add.at(phage_total[1], phage_s.location, 1)
+
+        dfs = [_make_df(d) for d in phage_total]
+        for df, species in zip(dfs, ['phage', 'phage_s']):
+            df["species"] = sub("_data", "", species)
+        phg = pandas.concat(dfs)
+
 
         minv = 0.250
         if max_phage > 0:
@@ -508,13 +516,15 @@ def _plot_frame(
                 max_phage - minp
             ) + minv
 
-        phg["species"] = "phage"
+  
+ 
+
 
         # combine, and clear out empty cells. Otherwise, alpha is minv
 
         # NORMAL:
-        colors = ["red", "blue", "green", "black"]
-        lims = ["gen0", "gen1", "infected", "phage"]
+        colors = ["red", "blue", "green", "black", "grey"]
+        lims = ["gen0", "gen1", "infected", "phage", "phage_s"]
 
         if style == "single":
             colors = ["red", "orange", "green", "black"]
@@ -528,6 +538,9 @@ def _plot_frame(
         lims = ["Species1", "Species2", "Matrix1"]
         colors = ["red", "blue", "green", "black"]
         lims = ["gen0", "gen1", "infected", "phage"]
+
+        colors = ["red", "blue", "green", "orange", "black"]
+        lims = ["gen0", "gen1", "infected", "phage", "phage_s"]
 
 
         if solute_adjustment is not None:
@@ -1139,16 +1152,13 @@ def plot_heatmap(
     data = data.copy()
     for column in data:
         print(column)
-    data["phage_ratio"] = [(s+1)/(g+1) for (s,g) in zip(data["phage_s_prod"], data["phage_prod"])]
-    data["phage_frequency"] = [(s+1)/(s+g+1) for (s,g) in zip(data["phage_s_prod"], data["phage_prod"])]
+    data["phage_ratio"] = [(s+1)/(g+1) for (s,g) in zip(data["phage_s_N"], data["phage_N"])]
+    data["phage_frequency"] = [(s+1)/(s+g+1) for (s,g) in zip(data["phage_s_total"], data["phage_total"])]
     
-    for (s,g,i, f, n1, n2) in zip(data["phage_s_prod"], data["phage_prod"], data["incubation_period"], data["init_f"], data["phage_N"], data["phage_s_N"]):
-        if n1==0 and n2==0:
-            print(s)
-            print(g)
-            print((s+1)/(s+g+1))
-            print(f)
-            print("BREAK")
+    # for (s,g,i, f, n1, n2, seed) in zip(data["phage_s_prod"], data["phage_prod"], data["incubation_period"], data["init_f"], data["phage_N"], data["phage_s_N"], data["seed"]):
+    #     if s==0 and g==0:
+    #         print(seed)
+    #         print("BREAK")
 
     if facets is None:
         axes = [xcol, ycol]
@@ -1157,8 +1167,10 @@ def plot_heatmap(
     if (
         "run" in data and len(data[data.run == data.run.unique()[0]]) > 1
     ):  # if not already filtered somehow
-        data = data.groupby("run").apply(lambda x: x.iloc[-1])
+        print("runs this?")
+        data = data.groupby("run").apply(lambda x: x.iloc[40:])
     if summary == "mean":
+        data = data.groupby("run").apply(lambda x: x.iloc[-1])
         df = data.groupby(axes).mean().reset_index()
     elif summary == "var":
         df = data.groupby(axes).var().reset_index()
@@ -1427,6 +1439,33 @@ def explorer(df, plotfunc, groups, sets=None, onupdate=None, updatef=None):
 
     plt.show()
 
+def plot_dim(data, fill):
+    data = data.copy()
+
+    fig, ax = plt.subplots(figsize=(15,7))
+    df = data.groupby(["time"]).mean()["infected_N"].plot(ax=ax, color='red')
+    df2 = data.groupby(["time"]).mean()["infected_s_N"].plot(ax=ax, color='blue')
+    ax.legend()
+    fig.savefig("infected.png", dpi=150, bbox_inches="tight")
+
+    fig, ax = plt.subplots(figsize=(15,7))
+    df = data.groupby(["time"]).mean()["phage_N"].plot(ax=ax, color='red')
+    df2 = data.groupby(["time"]).mean()["phage_s_N"].plot(ax=ax, color='blue')
+    ax.legend()
+    fig.savefig("phage.png", dpi=150, bbox_inches="tight")
+
+    fig, ax = plt.subplots(figsize=(15,7))
+    df = data.groupby(["time"]).mean()["phage_produced"].plot(ax=ax, color='red')
+    df2 = data.groupby(["time"]).mean()["phage_s_produced"].plot(ax=ax, color='blue')
+    ax.legend()
+    fig.savefig("prod.png", dpi=150, bbox_inches="tight")
+
+    fig, ax = plt.subplots(figsize=(15,7))
+    df = data.groupby(["time"]).mean()["species1_N"].plot(ax=ax, color='red')
+    df2 = data.groupby(["time"]).mean()["species2_N"].plot(ax=ax, color='blue')
+    ax.legend()
+    fig.savefig("species.png", dpi=150, bbox_inches="tight")
+  
 
 def _main():
 
@@ -1488,7 +1527,8 @@ def _main():
 if __name__ == "__main__":
     #plot_heatmap(load_data("data/2021.03.10/burstsweep", write_summaries=False), xcol="init_f", ycol="phage_burst",fill="phage_ratio", fmin=0, fmax = 2)
     #plot_heatmap(load_data("data/2021.03.14/ltime", write_summaries=False), xcol="incubation_period", ycol="init_f",fill="phage_ratio")
-    plot_heatmap(load_data("data/2021.03.30/sweeplog", write_summaries=False), ycol="incubation_period", xcol="init_f",fill="phage_frequency")
-    #plot_heatmap(load_data("data/2021.03.18/justsp", write_summaries=False), xcol="incubation_period", ycol="init_f",fill="phage_prod")
+    #fplot_heatmap(load_data("data/2021.04.08/sweeplog", write_summaries=False), ycol="incubation_period", xcol="init_f",fill="phage_frequency")
+    plot_dim(load_data("data/2021.04.12/samelag"), "phage_N")
+    #plot_heatmap(load_data("data/2021.04.01/adsorb", write_summaries=False), ycol="adsorption_rate", xcol="init_f",fill="phage_frequency", fmin=0, fmax=1)
     #return load_data("data/2021.02.28/biggerheat", write_summaries=False)
     _main()
