@@ -460,11 +460,12 @@ def _plot_frame(
 
         gridcols = np.unravel_index(range(np.prod(shape)), shape)
 
+
         # set up biomass
         biomass = [np.rec.array(f[x]) for x in biomass_names]
        
     
-        biomass_totals = [np.zeros(np.prod(shape)) for x in ['gen0', 'gen1', 'infected']]
+        biomass_totals = [np.zeros(np.prod(shape)) for x in ['Species1', 'Species2', 'infected']]
         for c in biomass:
             if not hasattr(c, 'genotype'):
                 [np.add.at(biomass_totals[2], c.location, c.mass)]
@@ -481,7 +482,7 @@ def _plot_frame(
             return pandas.DataFrame({"count": data, "x": gridcols[1], "y": gridcols[0]})
 
         dfs = [_make_df(d) for d in biomass_totals]
-        for df, species in zip(dfs, ['gen0', 'gen1', 'infected']):
+        for df, species in zip(dfs, ['Species1', 'Species2', 'infected']):
             df["species"] = sub("_data", "", species)
         bio = pandas.concat(dfs)
         minv = 0.20
@@ -495,6 +496,7 @@ def _plot_frame(
         phage_s = np.rec.array(f[phage_names[1]])
 
         phage_total = [np.zeros(np.prod(shape)) for x in ['phage','phage_s']]
+
         np.add.at(phage_total[0], phage.location, 1)
         np.add.at(phage_total[1], phage_s.location, 1)
 
@@ -504,7 +506,8 @@ def _plot_frame(
         phg = pandas.concat(dfs)
 
 
-        minv = 0.250
+        #minv = .250
+        minv = 1.250
         if max_phage > 0:
             max_phage = np.log10(max_phage)
         minp = np.log10(phg[phg["count"] > 0]["count"].min())
@@ -515,6 +518,7 @@ def _plot_frame(
             phg["alpha"] = ((0.95 - minv) * (np.log10(phg["count"]) - minp)) / (
                 max_phage - minp
             ) + minv
+            
 
   
  
@@ -540,7 +544,7 @@ def _plot_frame(
         lims = ["gen0", "gen1", "infected", "phage"]
 
         colors = ["red", "blue", "green", "orange", "black"]
-        lims = ["gen0", "gen1", "infected", "phage", "phage_s"]
+        lims = ["Species1", "Species2", "infected", "phage", "phage_s"]
 
 
         if solute_adjustment is not None:
@@ -1150,11 +1154,13 @@ def plot_heatmap(
 
     # TODO: fix varnames.
     data = data.copy()
-    for column in data:
-        print(column)
-    data["phage_ratio"] = [(s+1)/(g+1) for (s,g) in zip(data["phage_s_N"], data["phage_N"])]
-    data["phage_frequency"] = [(s+1)/(s+g+1) for (s,g) in zip(data["phage_s_total"], data["phage_total"])]
-    
+    # data = data.loc[(data["group"]=="burst")]
+    # data = data.loc[(data["max"]=="4")]
+    #data["phage_ratio"] = [(s+1)/(g+1) for (s,g) in zip(data["phage_s_N"], data["phage_N"])]
+    #data["phage_frequency"] = [(s+1)/(s+g+1) for (s,g) in zip(data["phage_s_total"], data["phage_total"])]
+  
+
+
     # for (s,g,i, f, n1, n2, seed) in zip(data["phage_s_prod"], data["phage_prod"], data["incubation_period"], data["init_f"], data["phage_N"], data["phage_s_N"], data["seed"]):
     #     if s==0 and g==0:
     #         print(seed)
@@ -1167,11 +1173,35 @@ def plot_heatmap(
     if (
         "run" in data and len(data[data.run == data.run.unique()[0]]) > 1
     ):  # if not already filtered somehow
-        print("runs this?")
+
         data = data.groupby("run").apply(lambda x: x.iloc[40:])
+        
     if summary == "mean":
         data = data.groupby("run").apply(lambda x: x.iloc[-1])
+        data.loc[(data["surpassed"] == 0), 'surpassed']=150
+
+    
+        variance = {}
+
+        for inc in np.unique(data["phage_burst"]):
+            for f in np.unique(data["init_f"]):
+                df = data.loc[(data["phage_burst"]==inc)]
+                df = df.loc[(data["init_f"]==f)]
+                for (r,s, gen, sp) in zip(df["surpassed"].index,df["surpassed"],df["phage_N"],df["phage_s_N"]):
+                    if inc == '30' and f == '0.05':
+                        print("Run: " + str(r) + " Surp " + str(s)) 
+                        print("Gen: " + str(gen) + " Spec " + str(sp))
+                if f not in variance.keys():
+                    variance[f] = {}
+
+
+                variance[f][inc] = np.std(df["surpassed"])
+    
+        data["variance"] = [variance[i][j] for (i,j) in zip(data["init_f"], data["phage_burst"])]
+
         df = data.groupby(axes).mean().reset_index()
+        df["log_phage"] = np.log10(df["phage_total"])
+        df["log_phage_s"] = np.log10(df["phage_s_total"])
     elif summary == "var":
         df = data.groupby(axes).var().reset_index()
     elif summary == "sum":
@@ -1183,6 +1213,7 @@ def plot_heatmap(
 
     xlabs = (
         xlabs if xlabs is not None else ["{:0.2f}".format(float(x)) for x in df[xcol].unique()]
+
     )
     ylabs = (
         ylabs if ylabs is not None else ["{:0.2f}".format(float(y)) for y in df[ycol].unique()]
@@ -1198,6 +1229,7 @@ def plot_heatmap(
                 for i, u in enumerate(groups):
                     a[df[ax] == u] = i
                 df[ax] = a
+                
         else:
             norm_axes(df, xcol, ycol)
 
@@ -1213,24 +1245,22 @@ def plot_heatmap(
 
     # with ignore_copywarn():
     #     df[fill][df[fill] < 0] *= 4
+    
     plot = ggplot(data=df)
     plot += labels.xlab(xcol if xaxislabel is None else xaxislabel)
     plot += labels.ylab(ycol if yaxislabel is None else yaxislabel)
     plot += scales.scale_y_discrete(
         breaks=df[ycol].unique(), labels=ylabs, expand=(0.01, 0.01)
     )
-    # plot += scales.scale_x_reverse(breaks=df[xcol].unique(), labels=xlabs)
+   
+
     plot += scales.scale_x_discrete(
-        breaks=df[xcol].unique(), labels=xlabs, expand=(0.005, 0.005)
+        breaks= df[xcol].unique(), labels=xlabs, expand=(0.005, 0.005)
     )
     if facets is not None:
         plot += facet_wrap(facets, ncol=3)
 
 
-    # if len(facets) > 1:
-    #     plot += facet_wrap(facets, ncol=(df[facets[-1]].unique().size))
-    # else:
-    #     plot += facet_wrap(facets, ncol=int(np.sqrt(df[facets[0]].unique().size)))
 
     plot += theme(axis_text_x=element_text(rotation=90, hjust=1))
     plot += theme_bw()
@@ -1238,12 +1268,14 @@ def plot_heatmap(
     plot += geoms.geom_tile(aes(x=xcol, y=ycol, fill=fill))
     fmax = fmax if fmax is not None else df[fill].max()
     fmin = fmin if fmin is not None else df[fill].min()
-    #fmin=0
+    fmin=df["log_phage_s"].min()
+    fmin = 4
+    fmax=df["log_phage"].max()
     #fmax=2
     midpoint = (fmin + fmax) / 2
     #midpoint = 1
-    print(df[fill].max())
-    print(df[fill].min())
+    print(fmax)
+    print(fmin)
     if title:
         plot += labels.ggtitle(title)
 
@@ -1259,42 +1291,51 @@ def plot_heatmap(
     #fmin = -0.10
     #fmax = 0.55
     #stepsize = 80
-
+  
     plot += scales.scale_fill_gradientn(
-        colors=("#b2182b", "#f7f7f7", "#2166ac"),
-        # values=(0, 0.1, 1),
-        # breaks=np.arange(0, 100, 10),
-        #values=(0, fmin / (fmin - fmax), 1),
-        breaks=np.arange(fmin, fmax + stepsize / 10, stepsize),
+        colors=('white','blue'),
+        #breaks=np.arange(fmin, fmax + stepsize / 10, stepsize),
         limits=(fmin, fmax),
         midpoint=midpoint,
     )
 
 
-    # plot += scales.scale_fill_gradient(limits=(fmin, fmax), low='#f5f5f5',
-    #                                    high='#101088', midpoint=midpoint)
+    # plot += scales.scale_fill_gradientn(
+    #     colors=("#FF0000", "#FFA500", "#FFFF00", "#008000", "#9999ff", "#000066"),
+    #     values=(0, .0153, .031, .077, .5, 1),
+    #     # breaks=np.arange(0, 100, 10),
+    #     #values=(0, fmin / (fmin - fmax), 1),
+    #     breaks=(1, 5, 30, 65),
+    #     limits=(0, 65),
+    #     #midpoint=midpoint,
+    # )
 
-    # plot += scales.scale_fill_gradient(limits=(fmin, fmax), low='#352a86',
-    #                                    high='#f8fa0d', midpoint=5.5)
 
-    # plot += scales.scale_fill_gradient(limits=(fmin, fmax))
+    # plot += scales.scale_fill_gradientn(
+    #     colors=("#FF0000", "#FFA500", "#FFFF00", "#008000", "#9999ff", "#000066"),
+    #     values=(0, .0069, .0138, .0344, .5, 1),
+    #     # breaks=np.arange(0, 100, 10),
+    #     #values=(0, fmin / (fmin - fmax), 1),
+    #     breaks=(1, 5, 65, 145),
+    #     limits=(0, 145),
+    #     #midpoint=midpoint,
+    # )
+     
+    # plot += scales.scale_fill_gradientn(
+    #     colors=("#FF0000", "#FFA500", "#FFFF00", "#008000", "#9999ff", "#000066"),
+    #     values=(0, .0333, .0666, .1666, .5, 1),
+    #     # breaks=np.arange(0, 100, 10),
+    #     #values=(0, fmin / (fmin - fmax), 1),
+    #     breaks=(.04, 1, 5, 10, 20, 30),
+    #     limits=(0, 30),
+    #     #midpoint=midpoint,
+    # )
 
-    # scales.scale_fill_gradientn()
-    # if summary == 'var':
-    #     plot += scales.scale_fill_gradient(limits=(fmin, fmax), low='#f5f5f5',
-    #                                        high='#101088', midpoint=midpoint)
-    # elif alternate_color:
-    #     plot += scales.scale_fill_gradient2(limits=(fmin, fmax), low='#a6611a', mid='#f7f7f7',
-    #                                         high='#018571', midpoint=midpoint)
-    # else:
-    # plot += scales.scale_fill_gradient2(limits=(fmin, fmax), midpoint=midpoint)
     outname = "{}{}.{}".format(prefix, fill, format)
     print(outname)
     print(height)
     print(width)
-    # height = 5 * height
-    # plot.save(outname, height=4, width=7.5, dpi=150,
-    # plot.save(outname, height=height*3, width=width*3, dpi=150,
+
     plot.save(
         outname,
         height=height * 1.5,
@@ -1439,32 +1480,167 @@ def explorer(df, plotfunc, groups, sets=None, onupdate=None, updatef=None):
 
     plt.show()
 
-def plot_dim(data, fill):
-    data = data.copy()
 
+def plot_onephage(data, fill):
+    df = data.copy()
+    print(df.index)
+
+    
+    df["fitness_s"] = [(s+1)/(g+1) if (s !=0 and g!=0) else 0 for  (s,g) in zip(df['phage_s_infected'].shift(1, fill_value=0), df["infected_s_N"])]
+
+    #df = df.loc[(df["group"]=="overtake")]
+    
+    for inc in ['0.01','0.02','0.03','0.05','0.07','0.1','0.25','0.5','1']:
+         for imp in ['1', '2', '3', '5', '6', '8', '9']:
+             for s_max in ['1', '2', '3', '5', '6', '8', '9']:
+                print("Incubation : " + inc + " Max : " + s_max + " Imp : " + imp)
+                df = data.copy()
+                df = df.loc[df["phage_s_incubation_period"] == inc]
+                df = df.loc[df["impedance"] == imp]
+                df = df.loc[df["max"] == s_max]
+                #df = df.loc[df["phage_s_N"] != 0]
+                da = df.groupby("run").apply(lambda x: x.iloc[-1])
+
+                for index in da["phage_s_N"].index:
+                    if da.loc[index, "phage_s_N"] != 0:
+                        print(str(index) + ": phage_N -- " + str(da.loc[index, "phage_s_N"]) + " species2_N -- " + str(da.loc[index, "species2_N"]))
+                
+            
+            #print(da["phage_s_N"])
+    
+    # df = df.loc[df["phage_s_incubation_period"] == '0.5']
+    # df = df.loc[df["max"] == '3']
+
+
+    #print(df)
+    #df = df.loc[df["phage_burst"] == '25']
+    #df = df.loc[df["phage_s_burst"] == '1000']
+    
+    #print("BREAK") 
+    
+    #print(da["surpinf"])
+    
+
+    #print(df)
+    
+    df = df.loc[9, :]
     fig, ax = plt.subplots(figsize=(15,7))
-    df = data.groupby(["time"]).mean()["infected_N"].plot(ax=ax, color='red')
-    df2 = data.groupby(["time"]).mean()["infected_s_N"].plot(ax=ax, color='blue')
+    df2 = df.groupby(["time"]).mean()["infected_s_N"].plot(ax=ax, color='blue')
     ax.legend()
     fig.savefig("infected.png", dpi=150, bbox_inches="tight")
+    
 
     fig, ax = plt.subplots(figsize=(15,7))
-    df = data.groupby(["time"]).mean()["phage_N"].plot(ax=ax, color='red')
-    df2 = data.groupby(["time"]).mean()["phage_s_N"].plot(ax=ax, color='blue')
+    df2 = df.groupby(["time"]).mean()["phage_s_N"].plot(ax=ax, color='blue')
     ax.legend()
     fig.savefig("phage.png", dpi=150, bbox_inches="tight")
 
     fig, ax = plt.subplots(figsize=(15,7))
-    df = data.groupby(["time"]).mean()["phage_produced"].plot(ax=ax, color='red')
-    df2 = data.groupby(["time"]).mean()["phage_s_produced"].plot(ax=ax, color='blue')
+    df2 = df.groupby(["time"]).mean()["phage_s_produced"].plot(ax=ax, color='blue')
     ax.legend()
     fig.savefig("prod.png", dpi=150, bbox_inches="tight")
 
     fig, ax = plt.subplots(figsize=(15,7))
-    df = data.groupby(["time"]).mean()["species1_N"].plot(ax=ax, color='red')
-    df2 = data.groupby(["time"]).mean()["species2_N"].plot(ax=ax, color='blue')
+    df1 = df.groupby(["time"]).mean()["species1_N"].plot(ax=ax, color='red')
+    df2 = df.groupby(["time"]).mean()["species2_N"].plot(ax=ax, color='blue')
     ax.legend()
     fig.savefig("species.png", dpi=150, bbox_inches="tight")
+
+    fig, ax = plt.subplots(figsize=(15,7))
+    df2 = df.groupby(["time"]).mean()["fitness_s"].plot(ax=ax, color='blue')
+    ax.legend()
+    fig.savefig("fitness.png", dpi=150, bbox_inches="tight")
+
+    fig, ax = plt.subplots(figsize=(15,7))
+    df2 = df.groupby(["time"]).mean()["phage_s_total"].plot(ax=ax, color='blue')
+  
+    ax.legend()
+    fig.savefig("total.png", dpi=150, bbox_inches="tight")
+
+    fig, ax = plt.subplots(figsize=(15,7))
+    df2 = df.groupby(["time"]).mean()["phage_s_totalinf"].plot(ax=ax, color='blue')
+    
+    ax.legend()
+    fig.savefig("totalinf.png", dpi=150, bbox_inches="tight")
+
+def plot_dim(data, one, two):
+    df = data.copy()
+    print(df.index)
+
+    df["fitness"] = [(s+1)/(g+1) if (s !=0 and g!=0) else 0 for (s,g) in zip(df['phage_infected'].shift(1, fill_value=0), df["infected_N"])]
+    df["fitness_s"] = [(s+1)/(g+1) if (s !=0 and g!=0) else 0 for  (s,g) in zip(df['phage_s_infected'].shift(1, fill_value=0), df["infected_s_N"])]
+
+    #df = df.loc[(df["group"]=="var_f")]
+    df = df.loc[df["init_f"] == one]
+    df = df.loc[df["phage_burst"] == two]
+    #df = df.loc[1386, :]
+
+    #print(df)
+    #df = df.loc[df["phage_burst"] == '25']
+    #df = df.loc[df["phage_s_burst"] == '1000']
+    
+    #print("BREAK") 
+    
+    #print(da["surpinf"])
+    
+
+    #print(df)
+
+    fig, ax = plt.subplots(figsize=(15,7))
+    df1 = df.groupby(["time"]).mean()["infected_N"].plot(ax=ax, color='red')
+    df2 = df.groupby(["time"]).mean()["infected_s_N"].plot(ax=ax, color='blue')
+    ax.legend()
+    fig.savefig("infected.png", dpi=150, bbox_inches="tight")
+
+    fig, ax = plt.subplots(figsize=(15,7))
+    df1 = df.groupby(["time"]).mean()["phage_N"].plot(ax=ax, color='red')
+    df2 = df.groupby(["time"]).mean()["phage_s_N"].plot(ax=ax, color='blue')
+    ax.legend()
+    fig.savefig("phage.png", dpi=150, bbox_inches="tight")
+
+    fig, ax = plt.subplots(figsize=(15,7))
+    df1 = df.groupby(["time"]).mean()["phage_produced"].plot(ax=ax, color='red')
+    df2 = df.groupby(["time"]).mean()["phage_s_produced"].plot(ax=ax, color='blue')
+    ax.legend()
+    fig.savefig("prod.png", dpi=150, bbox_inches="tight")
+
+    fig, ax = plt.subplots(figsize=(15,7))
+    df1 = df.groupby(["time"]).mean()["species1_N"].plot(ax=ax, color='red')
+    df2 = df.groupby(["time"]).mean()["species2_N"].plot(ax=ax, color='blue')
+    ax.legend()
+    fig.savefig("species.png", dpi=150, bbox_inches="tight")
+
+    fig, ax = plt.subplots(figsize=(15,7))
+    df1 = df.groupby(["time"]).mean()["fitness"].plot(ax=ax, color='red')
+    df2 = df.groupby(["time"]).mean()["fitness_s"].plot(ax=ax, color='blue')
+    ax.legend()
+    fig.savefig("fitness.png", dpi=150, bbox_inches="tight")
+
+    fig, ax = plt.subplots(figsize=(15,7))
+    plt.xlim([0, 20])
+    #plt.ylim([0, .3e7])
+    df1 = df.groupby(["time"]).mean()["phage_total"].plot(ax=ax, color='red')
+    df2 = df.groupby(["time"]).mean()["phage_s_total"].plot(ax=ax, color='blue')
+   
+    ax.legend()
+    fig.savefig("total.png", dpi=150, bbox_inches="tight")
+
+    fig, ax = plt.subplots(figsize=(15,7))
+    df1 = df.groupby(["time"]).mean()["phage_totalinf"].plot(ax=ax, color='red')
+    df2 = df.groupby(["time"]).mean()["phage_s_totalinf"].plot(ax=ax, color='blue')
+  
+    ax.legend()
+    fig.savefig("totalinf.png", dpi=150, bbox_inches="tight")
+
+
+    fig, ax = plt.subplots(figsize=(15,7))
+    df1 = df.groupby(["time"]).mean()["phage_infected"].plot(ax=ax, color='red')
+    df2 = df.groupby(["time"]).mean()["phage_s_infected"].plot(ax=ax, color='blue')
+  
+    ax.legend()
+    fig.savefig("phage_infected.png", dpi=150, bbox_inches="tight")
+  
+  
   
 
 def _main():
@@ -1525,10 +1701,8 @@ def _main():
 
 
 if __name__ == "__main__":
-    #plot_heatmap(load_data("data/2021.03.10/burstsweep", write_summaries=False), xcol="init_f", ycol="phage_burst",fill="phage_ratio", fmin=0, fmax = 2)
-    #plot_heatmap(load_data("data/2021.03.14/ltime", write_summaries=False), xcol="incubation_period", ycol="init_f",fill="phage_ratio")
-    #fplot_heatmap(load_data("data/2021.04.08/sweeplog", write_summaries=False), ycol="incubation_period", xcol="init_f",fill="phage_frequency")
-    plot_dim(load_data("data/2021.04.12/samelag"), "phage_N")
-    #plot_heatmap(load_data("data/2021.04.01/adsorb", write_summaries=False), ycol="adsorption_rate", xcol="init_f",fill="phage_frequency", fmin=0, fmax=1)
-    #return load_data("data/2021.02.28/biggerheat", write_summaries=False)
+  
+    #plot_heatmap(load_data("data/2021.05.15/long", write_summaries=False), ycol="incubation_period", xcol="init_f",fill="log_phage")
+    #plot_dim(load_data("data/2021.05.16/burst"), '0.3', '70')
+    #plot_onephage(load_data("data/2021.04.29/bigco"), "")
     _main()

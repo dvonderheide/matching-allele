@@ -71,18 +71,19 @@ def config():
             "general": {
                 "output_frequency": 1,
                 "nconnections": 1,
-                "seed": 65820157,
-                "runtime": 20,
+                "seed": 57585121,
+                "runtime": 150,
                 "init_count": 150,
-                "init_f": 0.9,
+                "init_f": 0.1,
                 "line_shove": False,
                 "max_sim_time": 100,
                 "3D": False,
                 "connectivity": 0.05,
                 "fixed_dt": 1 / 24 + 0.0000001,
                 "targetone": True,
+                "impedance": 6,
             },
-            "space": {"dl": 3e-6, "shape": (75, 200), "well_mixed": False},
+            "space": {"width": 200, "dl": 3e-6, "shape": (75, 200), "well_mixed": False},
             "infection": {'count': 120, 'height': 20e-6, 'duration': 600},
             "substrate": {"max": 6, "diffusivity": 2e-5, "K": 1.18, "h": 15e-6},
             "erosion": {"biomass_rate": 7.5e8, "phage_rate": 2.4e12},
@@ -140,7 +141,7 @@ def config():
                 "diffusivity": 3.30e-6,
                 "adsorption_rate": 70,
                 "burst": 120,
-                "incubation_period": 0.1,
+                "incubation_period": .1,
                 "adhesion": 1,
                 "genotype": 1,
                 "generalist": True,
@@ -152,7 +153,7 @@ def config():
                 "diffusivity": 3.30e-6,
                 "adsorption_rate": 70,
                 "burst": 120,
-                "incubation_period": 0.02,
+                "incubation_period": .02,
                 "adhesion": 1,
                 "genotype": 1,
                 "generalist": False,
@@ -176,6 +177,12 @@ def setup(cfg, outdir="tmp"):
         Bacteria("species1", space, cfg.species1, extragroups=['Susceptible']),
         Bacteria("species2", space, cfg.species2, extragroups=['Producer']),
     ]
+    if 'impedance' in cfg.general:
+        cfg.species1['impedance'] = cfg.general.impedance
+        cfg.species2['impedance'] = cfg.general.impedance
+
+    cfg.space['shape'] = (75, 400)
+
     phage = sb.Phage("phage", space, cfg.phage)
     infected = sb.InfectedBacteria("infected", space, cfg.infected, cfg.phage)
 
@@ -217,7 +224,7 @@ def setup(cfg, outdir="tmp"):
         sb.Phage_randomwalk(cfg.erosion.phage_rate),
         sb.Detach_biomass(),
         sb.Relax_biofilm(),
-        sb.Phage_interaction(pairs)
+        sb.Phage_interaction(pairs, log=True)
     )
 
 
