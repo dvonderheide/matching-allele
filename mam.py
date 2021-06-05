@@ -44,7 +44,7 @@ class Bacteria(sb.Bacteria):
             raise RuntimeError(msg)
         if phage.generalist:
             return [True, True]
-        return [bacterium.genotype == phage.genotype, bacterium.adsorbable]
+        return [bacterium.genotype == phage.genotype, bacterium.adsorbable] #determine if phage can infect
 
     def clone(self, parent, **params):
         """Clones parent exactly."""
@@ -55,7 +55,7 @@ class Bacteria(sb.Bacteria):
         #parameters['genotype'] = np.random.choice(4, p=parent.mut_rate[parent.genotype])
         mut = random()
 
-        if parent.genotype == 1 and mut < parent.mut_1:
+        if parent.genotype == 1 and mut < parent.mut_1: #species can mutate, and each genotype can have a different mu
             parameters['genotype'] = 0
             parameters['mu'] =  parent.mu_0
         elif mut < parent.mut_0:
@@ -72,7 +72,7 @@ def config():
                 "output_frequency": 1,
                 "nconnections": 1,
                 "seed": 57585121,
-                "runtime": 150,
+                "runtime": 20,
                 "init_count": 150,
                 "init_f": 0.1,
                 "line_shove": False,
@@ -83,7 +83,7 @@ def config():
                 "targetone": True,
                 "impedance": 6,
             },
-            "space": {"width": 200, "dl": 3e-6, "shape": (75, 200), "well_mixed": False},
+            "space": {"width": 400, "dl": 3e-6, "shape": (75, 400), "well_mixed": False},
             "infection": {'count': 120, 'height': 20e-6, 'duration': 600},
             "substrate": {"max": 6, "diffusivity": 2e-5, "K": 1.18, "h": 15e-6},
             "erosion": {"biomass_rate": 7.5e8, "phage_rate": 2.4e12},
@@ -167,7 +167,7 @@ def config():
 
 def setup(cfg, outdir="tmp"):
     """Do the thing."""
-
+    cfg.space['shape'] = (75, cfg.space['width'])
     space = sb.Space(cfg.space)
     sim = sb.Simulation(space, cfg)
 
@@ -181,7 +181,7 @@ def setup(cfg, outdir="tmp"):
         cfg.species1['impedance'] = cfg.general.impedance
         cfg.species2['impedance'] = cfg.general.impedance
 
-    cfg.space['shape'] = (75, 400)
+   
 
     phage = sb.Phage("phage", space, cfg.phage)
     infected = sb.InfectedBacteria("infected", space, cfg.infected, cfg.phage)
